@@ -192,7 +192,8 @@ class ProjectCreatorSystem:
             3. 의존성 분석
             4. 실행 방법 정의
             
-            응답 형식:
+            응답 형식 (정확히 이 형식을 따르세요):
+            
             ## 프로젝트 구조
             ```
             project_name/
@@ -216,31 +217,50 @@ class ProjectCreatorSystem:
             구체적이고 실행 가능한 프로젝트 구조를 제안하세요."""
         )
         
-        # 코드 생성자
+        # 코드 생성자 - 더 구체적인 지시사항
         self.code_generator = AssistantAgent(
             name="CodeGenerator", 
             model_client=self.create_model_client(),
             system_message="""당신은 코드 생성 전문가입니다.
             
+            ⚠️ 중요: 반드시 완전하고 실행 가능한 Python 코드를 생성해야 합니다!
+            
             역할:
-            1. 실행 가능한 Python 코드 작성
+            1. 실행 가능한 Python 코드 작성 (주석만 말고 실제 구현!)
             2. 모든 필요한 파일 생성
             3. 에러 처리 및 로깅 포함
-            4. 문서화 주석 추가
+            4. 완전한 기능 구현
             
-            파일별로 완전한 코드를 제공하세요:
+            ⚠️ 응답 형식을 정확히 따르세요:
             
-            **파일명: main.py**
+            FILE:main.py
             ```python
-            # 완전한 코드 내용
+            # 실제 완전한 Python 코드를 여기에 작성
+            import os
+            import sys
+            
+            def main():
+                print("Hello World")
+                # 실제 기능 구현
+                
+            if __name__ == "__main__":
+                main()
             ```
             
-            **파일명: requirements.txt**
+            FILE:requirements.txt
             ```
-            # 의존성 목록
+            flask==2.3.0
+            requests==2.31.0
             ```
             
-            각 파일은 즉시 실행 가능해야 합니다."""
+            FILE:README.md
+            ```markdown
+            # 프로젝트 제목
+            설명...
+            ```
+            
+            각 파일마다 FILE:파일명 으로 시작하고, 그 다음에 코드 블록을 작성하세요.
+            주석이나 설명만 쓰지 말고 실제 작동하는 코드를 구현하세요!"""
         )
         
         # 품질 보증
@@ -251,19 +271,27 @@ class ProjectCreatorSystem:
             
             역할:
             1. 코드 품질 검토
-            2. 보안 취약점 확인
-            3. 성능 최적화 제안
-            4. 테스트 케이스 작성
+            2. 누락된 구현 확인
+            3. 보안 취약점 확인
+            4. 성능 최적화 제안
             5. 실행 가능성 검증
             
-            다음을 확인하세요:
+            다음을 확인하고 부족한 부분이 있으면 구체적인 코드로 보완하세요:
             ✅ 코드 문법 오류
             ✅ import 문 누락
+            ✅ 실제 기능 구현 여부
             ✅ 파일 경로 오류
             ✅ 의존성 누락
             ✅ 실행 시나리오
             
-            문제가 있다면 구체적인 수정 방안을 제시하세요."""
+            만약 이전 에이전트가 주석만 생성했다면, 실제 구현 코드를 제공하세요:
+            
+            FILE:보완할파일명.py
+            ```python
+            # 실제 완전한 구현 코드
+            ```
+            
+            실행 가능한 완전한 코드를 보장하세요!"""
         )
     
     def create_team(self, max_turns: int = 8):
@@ -298,19 +326,39 @@ class ProjectCreatorSystem:
             
             enhanced_request = f"""다음 요청에 따라 완전히 실행 가능한 Python 프로젝트를 설계하고 구현해주세요:
 
-요청사항: {project_request}
+📋 요청사항: {project_request}
+📁 프로젝트명: {project_name}
 
-프로젝트명: {project_name}
+🎯 필수 요구사항:
+1. 즉시 실행 가능한 완전한 Python 코드 (주석만 말고!)
+2. 모든 import, 함수, 클래스 완전 구현
+3. 완전한 파일 구조 (폴더 포함)
+4. 실제 작동하는 의존성 (requirements.txt)
+5. 상세한 실행 방법 (README.md)
+6. 에러 처리 및 로깅 포함
+7. 기본 테스트 코드
 
-요구사항:
-1. 즉시 실행 가능한 코드
-2. 완전한 파일 구조
-3. 의존성 관리 (requirements.txt)
-4. 실행 방법 안내 (README.md)
-5. 에러 처리 포함
-6. 간단한 테스트 포함
+⚠️ 중요 지시사항:
+- 주석이나 설명만 쓰지 말고 실제 구현 코드를 작성하세요!
+- 모든 함수와 클래스는 완전히 구현되어야 합니다!
+- 파일 형식을 정확히 지켜주세요: FILE:filename.py
 
-각 에이전트는 자신의 역할에 맞게 기여해주세요."""
+🔥 예시 응답 형식:
+FILE:main.py
+```python
+import os
+import sys
+
+def actual_working_function():
+    # 실제 작동하는 코드
+    result = "Hello World"
+    return result
+
+if __name__ == "__main__":
+    print(actual_working_function())
+```
+
+각 에이전트는 자신의 역할에 맞게 완전한 코드를 구현해주세요!"""
             
             response = await team.run(task=enhanced_request)
             
@@ -329,89 +377,382 @@ class ProjectCreatorSystem:
             await self.cleanup()
     
     async def extract_and_create_files(self, response, project_name: str):
-        """협업 결과에서 파일 추출 및 생성"""
+        """협업 결과에서 파일 추출 및 생성 (개선된 버전)"""
         print("\n🔄 파일 추출 및 생성 중...")
         
-        # 기본 파일들 생성
         files_created = {}
         
         # 모든 메시지에서 코드 블록 찾기
         for message in response.messages:
             content = message.content
+            print(f"\n🔍 {message.source}의 메시지 분석 중...")
             
-            # 파일명과 코드 블록 추출
+            # 여러 패턴으로 파일 추출 시도
             import re
             
-            # **파일명: filename** 패턴 찾기
-            file_patterns = re.findall(r'\*\*파일명:\s*([^*]+)\*\*\s*```[a-zA-Z]*\n(.*?)```', content, re.DOTALL)
-            
-            for filename, code_content in file_patterns:
+            # 패턴 1: FILE:filename 형식
+            pattern1_matches = re.findall(r'FILE:([^\n]+)\s*```[a-zA-Z]*\s*\n(.*?)```', content, re.DOTALL)
+            for filename, code_content in pattern1_matches:
                 filename = filename.strip()
                 code_content = code_content.strip()
-                
-                if filename and code_content:
+                if filename and code_content and len(code_content) > 10:  # 너무 짧은 내용 제외
                     self.file_manager.write_file(filename, code_content)
                     files_created[filename] = True
+                    print(f"✅ FILE: 패턴으로 {filename} 생성 (길이: {len(code_content)})")
+            
+            # 패턴 2: **파일명: filename** 형식
+            pattern2_matches = re.findall(r'\*\*파일명:\s*([^*\n]+)\*\*\s*```[a-zA-Z]*\s*\n(.*?)```', content, re.DOTALL)
+            for filename, code_content in pattern2_matches:
+                filename = filename.strip()
+                code_content = code_content.strip()
+                if filename and code_content and len(code_content) > 10:
+                    if filename not in files_created:  # 중복 방지
+                        self.file_manager.write_file(filename, code_content)
+                        files_created[filename] = True
+                        print(f"✅ **파일명: 패턴으로 {filename} 생성 (길이: {len(code_content)})")
+            
+            # 패턴 3: # filename 또는 ## filename 형식
+            pattern3_matches = re.findall(r'#+\s*([^#\n]+\.py|[^#\n]+\.txt|[^#\n]+\.md|[^#\n]+\.html|[^#\n]+\.css|[^#\n]+\.js)\s*```[a-zA-Z]*\s*\n(.*?)```', content, re.DOTALL)
+            for filename, code_content in pattern3_matches:
+                filename = filename.strip()
+                code_content = code_content.strip()
+                if filename and code_content and len(code_content) > 10:
+                    if filename not in files_created:
+                        self.file_manager.write_file(filename, code_content)
+                        files_created[filename] = True
+                        print(f"✅ # 패턴으로 {filename} 생성 (길이: {len(code_content)})")
+            
+            # 패턴 4: 단순히 filename.extension 후 코드 블록
+            pattern4_matches = re.findall(r'([a-zA-Z0-9_/]+\.[a-zA-Z]+)\s*:?\s*```[a-zA-Z]*\s*\n(.*?)```', content, re.DOTALL)
+            for filename, code_content in pattern4_matches:
+                filename = filename.strip()
+                code_content = code_content.strip()
+                if filename and code_content and len(code_content) > 10:
+                    if filename not in files_created:
+                        self.file_manager.write_file(filename, code_content)
+                        files_created[filename] = True
+                        print(f"✅ 단순 패턴으로 {filename} 생성 (길이: {len(code_content)})")
         
-        # 기본 파일들이 없으면 생성
+        # 디버깅: 추출된 파일 목록 출력
+        if files_created:
+            print(f"\n📋 생성된 파일 목록:")
+            for filename in files_created.keys():
+                file_path = self.file_manager.current_project_path / filename
+                if file_path.exists():
+                    size = file_path.stat().st_size
+                    print(f"  - {filename} ({size} bytes)")
+        else:
+            print("⚠️ 추출된 파일이 없습니다. 수동으로 기본 파일들을 생성합니다.")
+            
+            # 원본 메시지 내용 출력 (디버깅용)
+            print("\n🔍 원본 메시지 내용 (디버깅):")
+            for i, message in enumerate(response.messages[:2]):  # 처음 2개 메시지만
+                print(f"\n--- {message.source} 메시지 {i+1} (처음 500자) ---")
+                print(message.content[:500])
+                print("..." if len(message.content) > 500 else "")
+        
+        # 기본 파일들이 없으면 템플릿으로 생성
         if 'requirements.txt' not in files_created:
-            self.create_default_requirements()
+            self.create_enhanced_requirements()
         
         if 'README.md' not in files_created:
-            self.create_default_readme(project_name)
+            self.create_enhanced_readme(project_name)
         
-        if 'main.py' not in files_created and 'app.py' not in files_created:
-            self.create_default_main()
+        if not any(f.endswith('.py') for f in files_created.keys()):
+            self.create_enhanced_main(project_name)
         
-        print(f"✅ 총 {len(files_created)} + 기본 파일들이 생성되었습니다.")
+        print(f"\n✅ 총 {len(files_created)}개 파일 + 기본 파일들이 생성되었습니다.")
+        return files_created
     
-    def create_default_requirements(self):
-        """기본 requirements.txt 생성"""
-        content = """# 기본 의존성
-# 필요에 따라 추가하세요
+    def create_enhanced_requirements(self):
+        """향상된 requirements.txt 생성"""
+        content = """# 기본 의존성 - 프로젝트에 따라 수정하세요
+requests>=2.25.0
+python-dotenv>=0.19.0
+
+# 웹 개발 (필요시 주석 해제)
+# flask>=2.0.0
+# fastapi>=0.68.0
+# uvicorn>=0.15.0
+
+# 데이터 분석 (필요시 주석 해제)
+# pandas>=1.3.0
+# numpy>=1.21.0
+# matplotlib>=3.4.0
+
+# CLI 도구 (필요시 주석 해제)
+# click>=8.0.0
+# rich>=10.0.0
+
+# 테스트 (필요시 주석 해제)
+# pytest>=6.0.0
+# pytest-cov>=2.12.0
 """
         self.file_manager.write_file("requirements.txt", content)
     
-    def create_default_readme(self, project_name: str):
-        """기본 README.md 생성"""
+    def create_enhanced_readme(self, project_name: str):
+        """향상된 README.md 생성"""
         content = f"""# {project_name}
 
-Autogen 다중 에이전트 시스템으로 생성된 프로젝트입니다.
+Autogen 다중 에이전트 시스템으로 생성된 Python 프로젝트입니다.
 
-## 설치
+## 🚀 빠른 시작
+
+### 설치
 
 ```bash
+# 가상환경 생성 (권장)
+python -m venv venv
+source venv/bin/activate  # Linux/Mac
+# 또는 Windows: venv\\Scripts\\activate
+
+# 의존성 설치
 pip install -r requirements.txt
 ```
 
-## 실행
+### 실행
 
 ```bash
 python main.py
 ```
 
-## 생성 정보
+## 📁 프로젝트 구조
 
-- 생성 시간: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
-- 생성 도구: Autogen + Gemini API
+```
+{project_name}/
+├── main.py              # 메인 실행 파일
+├── requirements.txt     # 의존성 목록  
+├── README.md           # 프로젝트 문서
+├── config/             # 설정 파일들
+├── modules/            # 추가 모듈들
+└── tests/              # 테스트 파일들
+```
+
+## 🛠️ 개발
+
+### 새로운 기능 추가
+1. `modules/` 디렉토리에 새 모듈 생성
+2. `main.py`에서 모듈 import
+3. 테스트 파일 작성
+
+### 테스트 실행
+```bash
+pytest tests/
+```
+
+## 📝 생성 정보
+
+- **생성 시간**: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+- **생성 도구**: Autogen + Gemini API
+- **Python 버전**: 3.8+
+
+## 🤝 기여
+
+이 프로젝트를 개선하고 싶으시다면:
+1. Fork 후 수정
+2. 테스트 추가
+3. Pull Request 생성
+
+## 📄 라이선스
+
+MIT License - 자유롭게 사용하세요!
 """
         self.file_manager.write_file("README.md", content)
     
-    def create_default_main(self):
-        """기본 main.py 생성"""
-        content = '''#!/usr/bin/env python3
+    def create_enhanced_main(self, project_name: str):
+        """향상된 main.py 생성"""
+        content = f'''#!/usr/bin/env python3
 """
-메인 실행 파일
+{project_name} - 메인 실행 파일
+
+Autogen 다중 에이전트 시스템으로 생성된 프로젝트입니다.
+이 파일을 수정하여 원하는 기능을 구현하세요.
 """
+
+import sys
+import os
+import argparse
+from datetime import datetime
+
+# 프로젝트 루트 디렉토리를 Python 경로에 추가
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+
+def setup_logging():
+    """로깅 설정"""
+    import logging
+    
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+        handlers=[
+            logging.FileHandler('app.log'),
+            logging.StreamHandler(sys.stdout)
+        ]
+    )
+    return logging.getLogger(__name__)
+
+def load_config():
+    """설정 로드"""
+    try:
+        from dotenv import load_dotenv
+        load_dotenv()
+        
+        config = {{
+            'debug': os.getenv('DEBUG', 'False').lower() == 'true',
+            'log_level': os.getenv('LOG_LEVEL', 'INFO'),
+        }}
+        return config
+    except ImportError:
+        print("python-dotenv가 설치되지 않았습니다. 기본 설정을 사용합니다.")
+        return {{'debug': False, 'log_level': 'INFO'}}
+
+def example_function():
+    """예제 함수 - 실제 기능으로 교체하세요"""
+    logger = setup_logging()
+    
+    logger.info("프로젝트가 성공적으로 시작되었습니다!")
+    
+    # 여기에 실제 기능을 구현하세요
+    print(f"🎉 {{project_name}} 프로젝트가 실행되었습니다!")
+    print(f"📅 실행 시간: {{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}}")
+    print(f"🐍 Python 버전: {{sys.version}}")
+    print(f"📁 작업 디렉토리: {{os.getcwd()}}")
+    
+    # 예제 작업
+    example_data = [1, 2, 3, 4, 5]
+    result = sum(example_data)
+    print(f"📊 예제 계산 결과: {{example_data}} 의 합 = {{result}}")
+    
+    return result
 
 def main():
-    print("프로젝트가 성공적으로 실행되었습니다!")
-    print("이 파일을 수정하여 원하는 기능을 구현하세요.")
+    """메인 함수"""
+    parser = argparse.ArgumentParser(description='{project_name} - 프로젝트 실행')
+    parser.add_argument('--debug', action='store_true', help='디버그 모드로 실행')
+    parser.add_argument('--config', type=str, help='설정 파일 경로')
+    
+    args = parser.parse_args()
+    
+    # 설정 로드
+    config = load_config()
+    
+    if args.debug:
+        config['debug'] = True
+    
+    # 디버그 정보 출력
+    if config['debug']:
+        print("🐛 디버그 모드로 실행 중...")
+        print(f"설정: {{config}}")
+    
+    try:
+        # 메인 로직 실행
+        result = example_function()
+        
+        print(f"\\n✅ 프로젝트 실행 완료! 결과: {{result}}")
+        return 0
+        
+    except KeyboardInterrupt:
+        print("\\n⏹️ 사용자에 의해 중단되었습니다.")
+        return 1
+    except Exception as e:
+        print(f"\\n❌ 오류가 발생했습니다: {{e}}")
+        if config['debug']:
+            import traceback
+            traceback.print_exc()
+        return 1
 
 if __name__ == "__main__":
-    main()
+    exit_code = main()
+    sys.exit(exit_code)
 '''
         self.file_manager.write_file("main.py", content)
+        
+        # 추가로 기본 모듈 구조도 생성
+        self.create_basic_project_structure(project_name)
+    
+    def create_basic_project_structure(self, project_name: str):
+        """기본 프로젝트 구조 생성"""
+        
+        # modules 디렉토리와 __init__.py
+        self.file_manager.create_directory("modules")
+        modules_init = '''"""
+프로젝트 모듈들
+
+여기에 재사용 가능한 모듈들을 작성하세요.
+"""
+
+__version__ = "0.1.0"
+__author__ = "Autogen System"
+'''
+        self.file_manager.write_file("modules/__init__.py", modules_init)
+        
+        # config 디렉토리
+        self.file_manager.create_directory("config")
+        
+        # .env 예제 파일
+        env_example = f'''# {project_name} 환경 설정
+
+# 디버그 모드
+DEBUG=False
+
+# 로그 레벨 (DEBUG, INFO, WARNING, ERROR)
+LOG_LEVEL=INFO
+
+# 데이터베이스 URL (예시)
+# DATABASE_URL=sqlite:///app.db
+
+# API 키들 (예시)
+# API_KEY=your_api_key_here
+# SECRET_KEY=your_secret_key_here
+
+# 서버 설정 (웹 앱인 경우)
+# HOST=0.0.0.0
+# PORT=5000
+'''
+        self.file_manager.write_file(".env.example", env_example)
+        
+        # tests 디렉토리와 기본 테스트
+        self.file_manager.create_directory("tests")
+        test_main = f'''"""
+{project_name} 테스트
+
+기본 테스트 파일입니다.
+"""
+
+import unittest
+import sys
+import os
+
+# 프로젝트 루트를 경로에 추가
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+
+class TestMain(unittest.TestCase):
+    """메인 모듈 테스트"""
+    
+    def test_import(self):
+        """모듈 import 테스트"""
+        try:
+            import main
+            self.assertTrue(True)
+        except ImportError as e:
+            self.fail(f"main 모듈을 import할 수 없습니다: {{e}}")
+    
+    def test_example_function(self):
+        """예제 함수 테스트"""
+        try:
+            import main
+            result = main.example_function()
+            self.assertIsNotNone(result)
+            self.assertIsInstance(result, (int, float))
+        except Exception as e:
+            self.fail(f"example_function 실행 실패: {{e}}")
+
+if __name__ == '__main__':
+    unittest.main()
+'''
+        self.file_manager.write_file("tests/test_main.py", test_main)
+        
+        print("📁 기본 프로젝트 구조가 생성되었습니다.")
     
     async def setup_and_test_project(self, project_dir: Path):
         """프로젝트 설정 및 테스트"""
@@ -444,49 +785,146 @@ if __name__ == "__main__":
 
 # 프로젝트 생성 예제들
 class ProjectExamples:
-    """프로젝트 생성 예제들"""
+    """프로젝트 생성 예제들 (더 구체적)"""
     
     @staticmethod
     def web_app_example():
-        return """Flask를 사용한 간단한 할 일 관리 웹 앱을 만들어주세요.
-        
-기능:
-- 할 일 추가/삭제/완료
-- 웹 인터페이스 (HTML/CSS)
-- 데이터는 JSON 파일에 저장
-- 기본 API 엔드포인트 제공"""
+        return """Flask를 사용한 완전한 할 일 관리 웹 앱을 만들어주세요.
+
+🎯 구체적인 기능:
+- GET /: 메인 페이지 (HTML 템플릿)
+- POST /add: 새 할 일 추가
+- POST /complete/<id>: 할 일 완료 처리
+- POST /delete/<id>: 할 일 삭제
+- 데이터는 todos.json 파일에 저장
+- Bootstrap CSS로 예쁜 인터페이스
+- 실시간 할 일 카운터
+
+🔧 기술 스택:
+- Flask (웹 프레임워크)
+- Jinja2 (템플릿)
+- JSON (데이터 저장)
+- Bootstrap (UI)
+
+📁 필요한 파일:
+- app.py (메인 Flask 앱)
+- templates/index.html (메인 페이지)
+- static/style.css (스타일)
+- requirements.txt (flask, jinja2)
+- README.md (설치/실행 방법)
+
+⚠️ 주의: 모든 파일을 완전히 구현하고, 즉시 실행 가능해야 합니다!"""
     
     @staticmethod
     def data_analysis_example():
-        return """pandas와 matplotlib을 사용한 데이터 분석 도구를 만들어주세요.
-        
-기능:
-- CSV 파일 읽기
-- 기본 통계 분석
-- 그래프 생성 (히스토그램, 산점도)
-- 결과를 HTML 리포트로 출력"""
+        return """pandas와 matplotlib을 사용한 완전한 데이터 분석 도구를 만들어주세요.
+
+🎯 구체적인 기능:
+- CSV 파일 자동 로드 및 분석
+- 기본 통계 (평균, 중앙값, 표준편차)
+- 히스토그램, 산점도, 상관관계 매트릭스 생성
+- HTML 리포트 자동 생성
+- 명령줄에서 실행 가능
+
+🔧 기술 스택:
+- pandas (데이터 처리)
+- matplotlib/seaborn (시각화)
+- jinja2 (HTML 리포트)
+- argparse (CLI)
+
+📁 필요한 파일:
+- main.py (메인 실행 파일)
+- analyzer.py (분석 로직)
+- report_generator.py (리포트 생성)
+- templates/report.html (리포트 템플릿)
+- sample_data.csv (예제 데이터)
+- requirements.txt
+
+⚠️ 주의: 실제 CSV를 읽고 그래프를 생성하는 완전한 코드 구현!"""
     
     @staticmethod
     def api_client_example():
-        return """REST API 클라이언트 라이브러리를 만들어주세요.
-        
-기능:
-- HTTP 요청 처리 (GET, POST, PUT, DELETE)
-- JSON 응답 파싱
-- 에러 처리 및 재시도 로직
-- 설정 파일 지원
-- 로깅 기능"""
+        return """완전한 REST API 클라이언트 라이브러리를 만들어주세요.
+
+🎯 구체적인 기능:
+- APIClient 클래스 (GET, POST, PUT, DELETE)
+- 자동 재시도 로직 (exponential backoff)
+- JSON 응답 자동 파싱
+- 에러 처리 및 로깅
+- 설정 파일 지원 (config.json)
+- 사용 예제 및 테스트
+
+🔧 기술 스택:
+- requests (HTTP 클라이언트)
+- json (설정/응답 처리)
+- logging (로깅)
+- time (재시도 로직)
+
+📁 필요한 파일:
+- client.py (APIClient 클래스)
+- config.py (설정 관리)
+- exceptions.py (커스텀 예외)
+- examples.py (사용 예제)
+- tests/test_client.py (테스트)
+- config.json (설정 파일)
+- requirements.txt
+
+⚠️ 주의: 실제 API 호출이 가능한 완전한 클라이언트 구현!"""
     
     @staticmethod
     def cli_tool_example():
-        return """명령줄 도구를 만들어주세요.
-        
-기능:
-- argparse를 사용한 명령줄 인자 처리
-- 여러 하위 명령어 지원
-- 파일 처리 기능
-- 진행률 표시
-- 설정 파일 지원"""
+        return """Click을 사용한 완전한 명령줄 도구를 만들어주세요.
+
+🎯 구체적인 기능:
+- 다중 하위 명령어 (init, process, status)
+- 파일 처리 (텍스트 파일 읽기/쓰기)
+- 진행률 표시바 (tqdm)
+- 설정 파일 지원 (.config.yaml)
+- 컬러 출력 (rich)
+- 로깅 및 디버그 모드
+
+🔧 기술 스택:
+- click (CLI 프레임워크)
+- tqdm (진행률 표시)
+- rich (컬러 출력)
+- pyyaml (설정 파일)
+
+📁 필요한 파일:
+- cli.py (메인 CLI)
+- commands/ (하위 명령어들)
+  - init.py
+  - process.py
+  - status.py
+- utils.py (유틸리티)
+- config.yaml (기본 설정)
+- requirements.txt
+
+⚠️ 주의: 실제로 명령어가 작동하는 완전한 CLI 도구 구현!"""
+    
+    @staticmethod
+    def game_example():
+        return """pygame을 사용한 간단한 2D 게임을 만들어주세요.
+
+🎯 구체적인 기능:
+- 플레이어 캐릭터 (키보드로 이동)
+- 적 캐릭터 (자동 이동)
+- 충돌 감지
+- 점수 시스템
+- 게임 오버 화면
+- 사운드 효과 (선택사항)
+
+🔧 기술 스택:
+- pygame (게임 엔진)
+- math (물리 계산)
+
+📁 필요한 파일:
+- game.py (메인 게임)
+- player.py (플레이어 클래스)
+- enemy.py (적 클래스)
+- assets/ (이미지, 사운드)
+- requirements.txt
+
+⚠️ 주의: 실제로 실행되는 완전한 게임 구현!"""
 
 async def main():
     """메인 실행 함수"""
@@ -502,11 +940,12 @@ async def main():
         print("3. 데이터 분석 도구 예제")
         print("4. API 클라이언트 예제")
         print("5. CLI 도구 예제")
+        print("6. 2D 게임 예제 (pygame)")
         
-        choice = input("\n선택 (1-5): ").strip()
+        choice = input("\n선택 (1-6): ").strip()
         
         if choice == "1":
-            project_request = input("만들고 싶은 프로젝트를 설명해주세요: ").strip()
+            project_request = input("만들고 싶은 프로젝트를 상세히 설명해주세요: ").strip()
         elif choice == "2":
             project_request = ProjectExamples.web_app_example()
             print(f"선택된 예제:\n{project_request}")
@@ -518,6 +957,9 @@ async def main():
             print(f"선택된 예제:\n{project_request}")
         elif choice == "5":
             project_request = ProjectExamples.cli_tool_example()
+            print(f"선택된 예제:\n{project_request}")
+        elif choice == "6":
+            project_request = ProjectExamples.game_example()
             print(f"선택된 예제:\n{project_request}")
         else:
             print("❌ 잘못된 선택입니다.")
