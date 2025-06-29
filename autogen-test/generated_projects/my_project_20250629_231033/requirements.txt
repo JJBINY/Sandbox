@@ -1,0 +1,2 @@
+# requirements.txt (이전 답변에서 제공된 완전한 의존성 목록)
+# Flask

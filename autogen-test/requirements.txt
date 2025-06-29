@@ -1,0 +1,15 @@
+# Autogen 0.4.x 패키지
+autogen-agentchat>=0.4.0
+autogen-ext>=0.4.0
+
+# Gemini API
+google-generativeai>=0.8.0
+
+# 기타 필수 패키지
+python-dotenv>=1.0.0
+asyncio-throttle>=1.0.2
+pydantic>=2.0.0
+
+# 선택사항 - 추가 기능용
+# autogen-ext[openai]  # OpenAI 모델도 사용하고 싶다면
+# autogen-ext[azure]   # Azure OpenAI도 사용하고 싶다면
