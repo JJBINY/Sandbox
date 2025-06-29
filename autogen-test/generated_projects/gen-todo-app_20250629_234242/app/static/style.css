@@ -1,0 +1,19 @@
+/* Custom styles can be added here */
+body {
+    background-color: #f8f9fa; /* Light grey background */
+}
+
+.container {
+    max-width: 800px; /* Limit container width for better readability */
+}
+
+.list-group-item.list-group-item-success {
+    background-color: #d1e7dd; /* Lighter green for completed items */
+}
+
+/* Optional: improve spacing for small screens */
+@media (max-width: 576px) {
+    .btn-group form {
+        margin-bottom: 5px;
+    }
+}

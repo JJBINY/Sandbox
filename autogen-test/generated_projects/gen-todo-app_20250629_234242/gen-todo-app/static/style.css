@@ -1,0 +1,82 @@
+/* Custom styles for the To-Do App */
+
+body {
+    font-family: 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    background-color: #e9ecef; /* Light grey background */
+    color: #343a40; /* Dark text for readability */
+}
+
+.container {
+    max-width: 768px; /* Limit container width for better readability on large screens */
+    padding: 20px;
+}
+
+h1 {
+    color: #007bff; /* Primary blue for main heading */
+    font-weight: 700;
+    margin-bottom: 30px;
+}
+
+.card {
+    border: none; /* Remove default card border */
+    border-radius: 0.75rem; /* Slightly larger border radius for cards */
+    overflow: hidden; /* Ensures content stays within rounded corners */
+}
+
+.card-header {
+    background-color: #f8f9fa; /* Lighter header background */
+    color: #495057;
+    font-weight: 600;
+    border-bottom: 1px solid #dee2e6;
+}
+
+.list-group-item {
+    border-color: #e0e0e0; /* Lighter border for list items */
+}
+
+/* Style for completed todo items */
+.list-group-item.completed-todo {
+    background-color: #d4edda; /* Light green for completed items */
+    border-color: #c3e6cb;
+}
+
+.todo-title {
+    flex-grow: 1; /* Allow title to take up available space */
+    padding-right: 15px; /* Space between title and buttons */
+    word-break: break-word; /* Break long words */
+}
+
+/* Ensure buttons in group are aligned */
+.btn-group .form-control {
+    flex-grow: 1;
+}
+
+.btn-group > form {
+    display: inline-block; /* Ensure form buttons are in a line */
+}
+
+/* Adjust button spacing within group */
+.btn-group .btn {
+    padding: 0.375rem 0.75rem; /* Standard Bootstrap button padding */
+    font-size: 0.875rem; /* Smaller font size for action buttons */
+}
+
+/* Responsive adjustments for smaller screens */
+@media (max-width: 576px) {
+    .btn-group {
+        flex-direction: column; /* Stack buttons vertically on small screens */
+    }
+    .btn-group form {
+        width: 100%; /* Make forms full width */
+        margin-bottom: 5px; /* Add space between stacked buttons */
+    }
+    .btn-group form:last-child {
+        margin-bottom: 0; /* No margin after the last button */
+    }
+}
+
+/* Flash messages styling */
+.alert-container {
+    position: relative;
+    z-index: 1050; /* Ensure alerts are above other content */
+}
