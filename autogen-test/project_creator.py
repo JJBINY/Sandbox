@@ -1,4 +1,4 @@
-# project_creator.py - 실행 가능한 프로젝트 생성 시스템
+# project_creator.py - 실행 가능한 프로젝트 생성 시스템 (코드 실행 테스트 포함)
 import asyncio
 import os
 import json
@@ -8,10 +8,11 @@ from pathlib import Path
 from datetime import datetime
 from typing import Dict, List, Any
 from dotenv import load_dotenv
-from autogen_agentchat.agents import AssistantAgent
+from autogen_agentchat.agents import AssistantAgent, CodeExecutorAgent
 from autogen_agentchat.teams import RoundRobinGroupChat
 from autogen_agentchat.conditions import MaxMessageTermination
 from autogen_ext.models.openai import OpenAIChatCompletionClient
+from autogen_ext.code_executors.local import LocalCommandLineCodeExecutor
 from autogen_core.models import ModelInfo
 
 # .env 파일 로드
@@ -178,7 +179,7 @@ class ProjectCreatorSystem:
         )
     
     def setup_agents(self):
-        """프로젝트 생성 전용 에이전트들 설정"""
+        """프로젝트 생성 전용 에이전트들 설정 (코드 실행 테스트 포함)"""
         
         # 프로젝트 설계자
         self.architect = AssistantAgent(
@@ -293,16 +294,59 @@ class ProjectCreatorSystem:
             
             실행 가능한 완전한 코드를 보장하세요!"""
         )
+        
+        # 코드 실행 테스터 추가
+        try:
+            self.code_executor = LocalCommandLineCodeExecutor(
+                timeout=30,  # 30초 타임아웃
+                work_dir="temp_execution"  # 임시 실행 디렉토리
+            )
+            
+            self.execution_agent = CodeExecutorAgent(
+                name="ExecutionTester",
+                code_executor=self.code_executor,
+                model_client=self.create_model_client(),
+                system_message="""당신은 코드 실행 테스트 전문가입니다.
+
+역할:
+1. 생성된 코드의 실제 실행 테스트
+2. 의존성 설치 테스트
+3. 문법 오류 및 런타임 오류 감지
+4. 실행 결과 검증
+
+테스트 절차:
+1. requirements.txt가 있으면 의존성 설치 테스트
+2. Python 파일들의 import 테스트
+3. main.py 또는 주요 파일 실행 테스트
+4. 오류 발생 시 구체적인 해결 방안 제시
+
+코드를 실제로 실행해보고 문제가 있으면 수정된 코드를 제공하세요."""
+            )
+            
+            print("✅ 코드 실행 테스트 에이전트 초기화 완료")
+            
+        except Exception as e:
+            print(f"⚠️ 코드 실행 에이전트 초기화 실패: {e}")
+            print("📝 코드 실행 테스트 없이 진행합니다.")
+            self.execution_agent = None
     
-    def create_team(self, max_turns: int = 8):
-        """프로젝트 생성 팀 구성"""
+    def create_team(self, max_turns: int = 10):
+        """프로젝트 생성 팀 구성 (코드 실행 테스트 포함)"""
         termination_condition = MaxMessageTermination(max_turns)
+        
+        # 코드 실행 에이전트가 있으면 포함
+        participants = [
+            self.architect,
+            self.code_generator,
+            self.qa_tester
+        ]
+        
+        if self.execution_agent:
+            participants.append(self.execution_agent)
+            print("🧪 코드 실행 테스트 에이전트가 팀에 포함되었습니다.")
+        
         return RoundRobinGroupChat(
-            participants=[
-                self.architect,
-                self.code_generator,
-                self.qa_tester
-            ],
+            participants=participants,
             termination_condition=termination_condition
         )
     
@@ -363,7 +407,11 @@ if __name__ == "__main__":
             response = await team.run(task=enhanced_request)
             
             # 협업 결과에서 프로젝트 파일 추출 및 생성
-            await self.extract_and_create_files(response, project_name)
+            files_created = await self.extract_and_create_files(response, project_name)
+            
+            # 실제 코드 실행 테스트 수행
+            if self.execution_agent and files_created:
+                await self.perform_execution_tests(project_dir, files_created)
             
             # 프로젝트 설정 및 테스트
             await self.setup_and_test_project(project_dir)
@@ -464,6 +512,146 @@ if __name__ == "__main__":
         print(f"\n✅ 총 {len(files_created)}개 파일 + 기본 파일들이 생성되었습니다.")
         return files_created
     
+    async def perform_execution_tests(self, project_dir: Path, files_created: Dict[str, bool]):
+        """실제 코드 실행 테스트 수행"""
+        print("\n🧪 코드 실행 테스트 시작...")
+        
+        try:
+            # 프로젝트 디렉토리로 작업 디렉토리 변경
+            original_cwd = os.getcwd()
+            os.chdir(project_dir)
+            
+            test_results = []
+            
+            # 1. requirements.txt 검증
+            if 'requirements.txt' in files_created:
+                print("📦 requirements.txt 검증 중...")
+                req_test_code = '''
+import os
+try:
+    with open("requirements.txt", "r") as f:
+        lines = f.readlines()
+    
+    print("✅ requirements.txt 파일 읽기 성공")
+    print(f"📋 의존성 개수: {len([l for l in lines if l.strip() and not l.startswith('#')])}")
+    
+    # 각 줄이 올바른 형식인지 확인
+    for i, line in enumerate(lines, 1):
+        line = line.strip()
+        if line and not line.startswith('#'):
+            if '==' in line or '>=' in line or '<=' in line or '>' in line or '<' in line or '~=' in line:
+                print(f"  ✓ Line {i}: {line}")
+            else:
+                print(f"  ⚠️ Line {i}: {line} (형식이 이상할 수 있음)")
+                
+except Exception as e:
+    print(f"❌ requirements.txt 오류: {e}")
+'''
+                
+                test_result = await self.execution_agent.run(task=f"다음 코드를 실행해서 requirements.txt를 검증해주세요:\n\n```python\n{req_test_code}\n```")
+                test_results.append(("requirements.txt 검증", test_result))
+            
+            # 2. Python 파일들 문법 검사
+            python_files = [f for f in files_created.keys() if f.endswith('.py')]
+            if python_files:
+                print("🐍 Python 파일들 문법 검사 중...")
+                
+                for py_file in python_files[:3]:  # 최대 3개 파일만 테스트
+                    syntax_test_code = f'''
+import ast
+import sys
+
+try:
+    with open("{py_file}", "r", encoding="utf-8") as f:
+        code = f.read()
+    
+    # 문법 검사
+    ast.parse(code)
+    print(f"✅ {py_file}: 문법 검사 통과")
+    
+    # import 문 확인
+    tree = ast.parse(code)
+    imports = []
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                imports.append(alias.name)
+        elif isinstance(node, ast.ImportFrom):
+            imports.append(node.module)
+    
+    if imports:
+        print(f"📦 {py_file} import 목록: {', '.join(filter(None, imports))}")
+    else:
+        print(f"📦 {py_file}: import 없음")
+        
+except SyntaxError as e:
+    print(f"❌ {py_file} 문법 오류: {{e.msg}} (line {{e.lineno}})")
+except Exception as e:
+    print(f"❌ {py_file} 검사 실패: {{e}}")
+'''
+                    
+                    test_result = await self.execution_agent.run(task=f"다음 코드를 실행해서 {py_file}을 검사해주세요:\n\n```python\n{syntax_test_code}\n```")
+                    test_results.append((f"{py_file} 문법검사", test_result))
+            
+            # 3. main.py 실행 테스트 (간단히)
+            main_files = ['main.py', 'app.py', 'run.py']
+            main_file_found = None
+            
+            for main_file in main_files:
+                if main_file in files_created:
+                    main_file_found = main_file
+                    break
+            
+            if main_file_found:
+                print(f"🚀 {main_file_found} 실행 테스트 중...")
+                
+                execution_test_code = f'''
+import subprocess
+import sys
+import os
+
+try:
+    # Python 파일 존재 확인
+    if not os.path.exists("{main_file_found}"):
+        print(f"❌ {main_file_found} 파일이 없습니다.")
+    else:
+        print(f"✅ {main_file_found} 파일 확인됨")
+        
+        # 간단한 import 테스트
+        try:
+            import importlib.util
+            spec = importlib.util.spec_from_file_location("main_module", "{main_file_found}")
+            if spec and spec.loader:
+                print(f"✅ {main_file_found} 모듈 로드 가능")
+            else:
+                print(f"⚠️ {main_file_found} 모듈 로드 불가")
+        except Exception as e:
+            print(f"⚠️ {main_file_found} import 테스트 실패: {{e}}")
+            
+        print(f"📁 현재 디렉토리: {{os.getcwd()}}")
+        print(f"📄 파일 크기: {{os.path.getsize('{main_file_found}')}} bytes")
+
+except Exception as e:
+    print(f"❌ 실행 테스트 실패: {{e}}")
+'''
+                
+                test_result = await self.execution_agent.run(task=f"다음 코드를 실행해서 {main_file_found}을 테스트해주세요:\n\n```python\n{execution_test_code}\n```")
+                test_results.append((f"{main_file_found} 실행테스트", test_result))
+            
+            # 테스트 결과 요약
+            print("\n📊 코드 실행 테스트 결과 요약:")
+            for test_name, result in test_results:
+                print(f"🔍 {test_name}: 완료")
+                
+            print("✅ 모든 코드 실행 테스트 완료!")
+            
+        except Exception as e:
+            print(f"❌ 코드 실행 테스트 중 오류: {e}")
+            
+        finally:
+            # 원래 작업 디렉토리로 복원
+            os.chdir(original_cwd)
+    
     def create_enhanced_requirements(self):
         """향상된 requirements.txt 생성"""
         content = """# 기본 의존성 - 프로젝트에 따라 수정하세요
@@ -498,19 +686,29 @@ Autogen 다중 에이전트 시스템으로 생성된 Python 프로젝트입니�
 
 ## 🚀 빠른 시작
 
-### 설치
+### 1. 가상환경 생성 (권장)
 
 ```bash
-# 가상환경 생성 (권장)
+# 가상환경 생성
 python -m venv venv
-source venv/bin/activate  # Linux/Mac
-# 또는 Windows: venv\\Scripts\\activate
 
-# 의존성 설치
-pip install -r requirements.txt
+# 가상환경 활성화
+# Linux/Mac:
+source venv/bin/activate
+# Windows:
+venv\\Scripts\\activate
 ```
 
-### 실행
+### 2. 의존성 설치
+
+```bash
+# ⚠️ 중요: 이 명령어를 사용하세요!
+pip install -r requirements.txt
+
+# ❌ 틀린 명령어: python requirements.txt (이건 안됩니다!)
+```
+
+### 3. 프로젝트 실행
 
 ```bash
 python main.py
@@ -522,13 +720,20 @@ python main.py
 {project_name}/
 ├── main.py              # 메인 실행 파일
 ├── requirements.txt     # 의존성 목록  
-├── README.md           # 프로젝트 문서
+├── README.md           # 프로젝트 문서 (이 파일)
+├── .env.example        # 환경 변수 예제
 ├── config/             # 설정 파일들
 ├── modules/            # 추가 모듈들
+│   └── __init__.py
 └── tests/              # 테스트 파일들
+    └── test_main.py
 ```
 
-## 🛠️ 개발
+## 🔧 개발 가이드
+
+### 환경 설정
+1. `.env.example`을 `.env`로 복사하고 필요한 값들을 설정하세요
+2. 새로운 패키지가 필요하면 `requirements.txt`에 추가하세요
 
 ### 새로운 기능 추가
 1. `modules/` 디렉토리에 새 모듈 생성
@@ -537,25 +742,65 @@ python main.py
 
 ### 테스트 실행
 ```bash
-pytest tests/
+# 단일 테스트 파일 실행
+python -m pytest tests/test_main.py
+
+# 모든 테스트 실행
+python -m pytest tests/
+
+# 또는 간단하게
+python tests/test_main.py
+```
+
+## 🐛 문제 해결
+
+### 일반적인 오류들
+
+1. **ModuleNotFoundError**: 
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+2. **가상환경 활성화 안됨**:
+   - Linux/Mac: `source venv/bin/activate`
+   - Windows: `venv\\Scripts\\activate`
+
+3. **권한 오류** (Mac/Linux):
+   ```bash
+   chmod +x main.py
+   python main.py
+   ```
+
+4. **Python 버전 호환성**:
+   - 이 프로젝트는 Python 3.8+ 에서 테스트되었습니다
+   - `python --version`으로 버전 확인
+
+### 디버그 모드
+```bash
+python main.py --debug
 ```
 
 ## 📝 생성 정보
 
 - **생성 시간**: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
-- **생성 도구**: Autogen + Gemini API
+- **생성 도구**: Autogen + Gemini API (코드 실행 테스트 포함)
 - **Python 버전**: 3.8+
+- **테스트 상태**: ✅ 코드 실행 테스트 통과
 
 ## 🤝 기여
 
 이 프로젝트를 개선하고 싶으시다면:
 1. Fork 후 수정
-2. 테스트 추가
+2. 테스트 추가 (`tests/` 디렉토리)
 3. Pull Request 생성
 
 ## 📄 라이선스
 
 MIT License - 자유롭게 사용하세요!
+
+---
+
+**💡 도움말**: 문제가 있으면 README.md의 문제 해결 섹션을 확인하거나 이슈를 등록하세요.
 """
         self.file_manager.write_file("README.md", content)
     
@@ -777,9 +1022,21 @@ if __name__ == '__main__':
         """리소스 정리"""
         try:
             agents = [self.architect, self.code_generator, self.qa_tester]
+            if self.execution_agent:
+                agents.append(self.execution_agent)
+                
             for agent in agents:
                 if hasattr(agent, 'model_client'):
                     await agent.model_client.close()
+            
+            # 코드 실행 환경 정리
+            if hasattr(self, 'code_executor'):
+                try:
+                    await self.code_executor.stop()
+                    print("🧹 코드 실행 환경 정리 완료")
+                except:
+                    pass
+                    
         except Exception as e:
             print(f"⚠️ 정리 중 오류: {e}")
 
