@@ -1,4 +1,4 @@
-from app.agents.agent_factory import AgentFactory
+from app.agent.agent_factory import AgentFactory
 from typing import Optional
 
 
